@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Connect Marketplace Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f6f9fc;
+            padding: 40px;
+            margin: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .catalog {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        h2 { color: #32325d; margin-top: 0; font-size: 20px;}
+        p { color: #525f7f; margin-bottom: 20px; font-size: 14px; flex-grow: 1;}
+        .price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #32325d;
+            margin-bottom: 20px;
+        }
+        button {
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s ease;
+            margin-bottom: 10px;
+        }
+        .btn-rent { background-color: #635bff; }
+        .btn-rent:hover { background-color: #0a2540; }
+        .btn-vendor { background-color: #00d4ff; color: #0a2540; font-weight: bold;}
+        .btn-vendor:hover { background-color: #00b8e6; }
+        .btn-delete { background-color: #ff4d4d; margin-top: 10px; }
+        .btn-delete:hover { background-color: #cc0000; }
+        .vendor-label { font-size: 12px; color: #8898aa; margin-bottom: 15px; font-style: italic; }
+        .admin-label { font-size: 11px; color: #8898aa; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; border-top: 1px solid #e6ebf1; padding-top: 15px;}
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 style="color: #32325d;">Astrophotography Gear Marketplace</h1>
+        <button id="onboard-button" class="btn-vendor" style="max-width: 250px;">+ List Your Gear (Become a Vendor)</button>
+    </div>
+
+   <div class="catalog">
+        {% for item_id, item in listings.items() %}
+        <div class="card" id="card-{{ item_id }}">
+            <h2>{{ item.name }}</h2>
+            <p>{{ item.description }}</p>
+            
+            <div class="vendor-label">Listed by: {{ item.vendor_name }} ({{ item.owner_account_id }})</div>
+            
+            <div class="price">${{ "{:.2f}".format(item.price_cents / 100) }}</div>
+            
+            <button class="btn-rent" onclick="handleCheckout('{{ item_id }}', this)">Rent Now</button>
+            
+            <div class="admin-label">Platform Admin Tools</div>
+            <button class="btn-delete" onclick="handleDelete('{{ item.owner_account_id }}', this, 'card-{{ item_id }}')">
+                Delete Vendor Account
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // --- 1. DYNAMIC CHECKOUT LOGIC ---
+        async function handleCheckout(itemId, buttonElement) {
+            buttonElement.innerText = 'Loading...';
+            buttonElement.disabled = true;
+
+            try {
+                const response = await fetch('/create-checkout-session', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_id: itemId }) // Send the specific item ID to Python
+                });
+                const data = await response.json();
+                
+                if (data.url) {
+                    window.location.href = data.url;
+                } else {
+                    console.error("Error:", data.error);
+                    buttonElement.innerText = 'Error. Check Console.';
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+            }
+        }
+
+        // --- 2. VENDOR DELETION LOGIC ---
+        async function handleDelete(accountId, buttonElement, cardId) {
+            if (!confirm("Are you sure you want to delete this Connect account? This simulates offboarding a vendor.")) return;
+            
+            buttonElement.innerText = 'Deleting...';
+            buttonElement.disabled = true;
+
+            try {
+                const response = await fetch('/delete-vendor', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accountId }) // Send the Account ID to Python
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Visually remove the item from the storefront
+                    document.getElementById(cardId).style.display = 'none';
+                    alert(`Success: Vendor Account ${accountId} deleted.`);
+                } else {
+                    console.error("Delete Error:", data.error);
+                    buttonElement.innerText = 'Delete Failed';
+                    buttonElement.disabled = false;
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+            }
+        }
+
+        // --- 3. VENDOR ONBOARDING LOGIC ---
+        document.getElementById('onboard-button').addEventListener('click', async () => {
+            const button = document.getElementById('onboard-button');
+            button.innerText = 'Generating Secure Link...';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('/onboard-vendor', { method: 'POST' });
+                const data = await response.json();
+                if (data.url) window.location.href = data.url;
+            } catch (error) {
+                console.error("Error:", error);
+                button.innerText = 'Error. Try Again.';
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Admin Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #e6ebf1; /* Slightly darker background for the admin side */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .admin-card {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+        h2 { color: #32325d; margin-top: 0; }
+        p { color: #525f7f; margin-bottom: 25px; line-height: 1.5; }
+        
+        .input-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #32325d;
+            margin-bottom: 8px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #c1c9d2;
+            border-radius: 4px;
+            box-sizing: border-box; /* Ensures padding doesn't affect width */
+            font-family: monospace; /* Good for reading IDs */
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #635bff;
+            box-shadow: 0 0 0 1px #635bff;
+        }
+
+        button {
+            color: white;
+            background-color: #ff4d4d;
+            border: none;
+            border-radius: 4px;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s ease;
+        }
+        button:hover { background-color: #cc0000; }
+        button:disabled { background-color: #ffb3b3; cursor: not-allowed; }
+        
+        #status-message {
+            margin-top: 20px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .success { color: #2e8b57; }
+        .error { color: #d93025; }
+    </style>
+</head>
+<body>
+
+    <div class="admin-card">
+        <h2>Admin: Offboard Vendor</h2>
+        <p>Use this tool to simulate a compliance or support action. Pasting a Connect Account ID here will permanently delete it from the Stripe platform.</p>
+        
+        <div class="input-group">
+            <label for="account-id">Stripe Connected Account ID</label>
+            <input type="text" id="account-id" placeholder="acct_1OuT..." autocomplete="off">
+        </div>
+
+        <button id="delete-btn">Permanently Delete Account</button>
+        
+        <div id="status-message"></div>
+    </div>
+
+    <script>
+        document.getElementById('delete-btn').addEventListener('click', async () => {
+            const inputField = document.getElementById('account-id');
+            const button = document.getElementById('delete-btn');
+            const statusMessage = document.getElementById('status-message');
+            
+            const accountId = inputField.value.trim();
+
+            // Basic validation
+            if (!accountId.startsWith('acct_')) {
+                statusMessage.className = 'error';
+                statusMessage.innerText = 'Invalid format. ID must start with "acct_".';
+                return;
+            }
+
+            if (!confirm(`DANGER: Are you sure you want to permanently delete account ${accountId}?`)) {
+                return;
+            }
+
+            // Update UI to loading state
+            button.innerText = 'Deleting...';
+            button.disabled = true;
+            statusMessage.innerText = '';
+
+            try {
+                // Send the exact same payload as the storefront delete button
+                const response = await fetch('/delete-vendor', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accountId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusMessage.className = 'success';
+                    statusMessage.innerText = `Success: Account ${data.deleted_id} has been deleted.`;
+                    inputField.value = ''; // Clear the input
+                } else {
+                    statusMessage.className = 'error';
+                    statusMessage.innerText = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                statusMessage.className = 'error';
+                statusMessage.innerText = 'Network error. Check console.';
+                console.error(error);
+            } finally {
+                // Reset UI
+                button.innerText = 'Permanently Delete Account';
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
